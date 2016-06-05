@@ -204,7 +204,7 @@ function main() {
 
     adapter.getState(hubName + '.hubConnected', function (err, state) {
         if (err || !state) {
-            adapter.log.info('hub not initialized');
+            adapter.log.info('hub not initialized, discover mode started');
             discoverStart();
         } else {
             adapter.getChannelsOf(hubName, function (err, channels) {
@@ -223,6 +223,7 @@ function main() {
                 });
                 adapter.getStates(hubName + '.activities.*', function (err, states) {
                     if (err || !states) {
+                        adapter.log.error("error with states");
                         return;
                     }
                     for (var state in states) {
@@ -234,7 +235,7 @@ function main() {
                             }
                         }
                     }
-                    adapter.log.info('discover start');
+                    adapter.log.info('discover started');
                     discoverStart();
                 });
             });
@@ -244,6 +245,7 @@ function main() {
 
 function discoverStart() {
     if (discover) {
+        adapter.log.warn("discover already started");
         return;
     }
     discover = new HarmonyHubDiscover(61991);
@@ -274,6 +276,7 @@ function discoverStart() {
 
 function clientStop() {
     setConnected(false);
+    setBlocked(false);
     if (client !== null) {
         client._xmppClient.on('error', function (e) {
             adapter.log.debug('xmpp error: ' + e);
@@ -290,8 +293,8 @@ function connect(hub) {
     harmony(hub.ip).timeout(5000).then(function (harmonyClient) {
         timestamp = Date.now();
         setBlocked(true);
-        adapter.log.info('connected to ' + hub.host_name);
         setConnected(true);
+        adapter.log.info('connected to ' + hub.host_name);
         client = harmonyClient;
 
         (function keepAlive() {
@@ -354,7 +357,11 @@ function connect(hub) {
 }
 
 function processConfig(hub, config) {
-    if (isSync) return;
+    if (isSync) {
+        setBlocked(false);
+        setConnected(true);
+        return;
+    } 
     /* create hub */
     adapter.log.info('creating activities and devices');
 
@@ -591,6 +598,7 @@ function setBlocked(bool) {
     if (statesExist) {
         bool = Boolean(bool);
         adapter.setState(hubName + '.hubBlocked', {val: bool, ack: true});
+        blocked = bool;
     }
 }
 
